@@ -1,0 +1,40 @@
+--- a/app.py
++++ b/app.py
+@@ -109,10 +109,12 @@
+ 
+     parts = []
+     for author, text in rows:
+-        # === УЯЗВИМОСТЬ №2: XSS ===
+-        # Текст подставляется в HTML БЕЗ экранирования (html.escape не вызывается).
+-        # Поэтому <script>...</script> из сообщения выполнится в браузере.
+-        parts.append('<div class="comment"><b>{}</b><br>{}</div>'.format(author, text))
++        # ИСПРАВЛЕНО (XSS): экранируем данные пользователя через html.escape().
++        # Теперь символы < > & " превращаются в безопасные &lt; &gt; и т.д.,
++        # поэтому <script> выводится как текст и НЕ выполняется браузером.
++        safe_author = html.escape(author)
++        safe_text = html.escape(text)
++        parts.append('<div class="comment"><b>{}</b><br>{}</div>'.format(safe_author, safe_text))
+     return "\n".join(parts)
+ 
+ 
+@@ -150,13 +152,14 @@
+ 
+         con = sqlite3.connect(DB_PATH)
+         cur = con.cursor()
+-        # === УЯЗВИМОСТЬ №1: SQL-инъекция ===
+-        # Данные пользователя напрямую вклеиваются в текст запроса.
+-        # Ввод  ' OR '1'='1  ломает логику условия и пускает без пароля.
+-        query = "SELECT username FROM users WHERE username = '%s' AND password = '%s'" % (username, password)
+-        print("[SQL]", query)  # для наглядности видно в консоли
++        # ИСПРАВЛЕНО (SQL-инъекция): используем параметризованный запрос.
++        # Данные передаются отдельно от текста запроса (знаки ?), и база
++        # воспринимает их только как значения, а не как часть SQL-команды.
+         try:
+-            cur.execute(query)
++            cur.execute(
++                "SELECT username FROM users WHERE username = ? AND password = ?",
++                (username, password),
++            )
+             row = cur.fetchone()
+         except Exception as e:
+             row = None
